@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KNA Finance Organization</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        'primary': '#4f46e5', // Indigo 600
+                        'secondary': '#10b981', // Emerald 500
+                        'bg-dark': '#1f2937',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+        }
+        
+        /* --- Card 3D Flip Styles --- */
+        .card-container {
+            perspective: 1000px;
+            height: 24rem; /* Fixed height for consistency */
+            width: 100%;
+        }
+        .flip-card {
+            width: 100%;
+            height: 100%;
+            transition: transform 0.6s cubic-bezier(0.4, 0.0, 0.2, 1);
+            transform-style: preserve-3d;
+            position: relative;
+            cursor: pointer;
+        }
+        .flip-card.flipped {
+            transform: rotateY(180deg);
+        }
+        .card-front, .card-back {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            -webkit-backface-visibility: hidden; /* Safari */
+            backface-visibility: hidden;
+            border-radius: 1rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            overflow: hidden;
+        }
+        .card-front {
+            background-color: white;
+            display: flex;
+            flex-direction: column;
+        }
+        .card-back {
+            background-color: #f9fafb;
+            transform: rotateY(180deg);
+            display: flex;
+            flex-direction: column;
+            border: 2px solid #e5e7eb;
+        }
+
+        /* Scrollbar for back content */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f1f1; 
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #d1d5db; 
+            border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #9ca3af; 
+        }
+
+        /* Fade In Animation */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .fade-in {
+            animation: fadeIn 0.4s ease-out forwards;
+        }
+
+        /* Loading Spinner */
+        .loader {
+            border: 4px solid #e5e7eb;
+            border-top: 4px solid #4f46e5;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen flex flex-col">
+
+    <!-- Header / Nav -->
+    <nav class="bg-white shadow-md sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0 flex items-center gap-3">
+                        <div class="bg-primary text-white p-2 rounded-lg">
+                            <i class="fa-solid fa-sitemap text-xl"></i>
+                        </div>
+                        <h1 class="text-xl font-bold text-gray-900 tracking-tight">KNA Finance <span class="text-gray-500 font-normal text-sm ml-1 hidden sm:inline">Interactive Org Chart</span></h1>
+                    </div>
+                </div>
+                <div class="flex items-center gap-4">
+                    <!-- File Upload Button in Header (Optional Override) -->
+                    <label for="csvFileInput" class="hidden md:flex cursor-pointer bg-indigo-50 hover:bg-indigo-100 text-primary px-3 py-1.5 rounded-lg text-xs font-medium transition-colors items-center gap-2">
+                        <i class="fa-solid fa-upload"></i> Update Data
+                    </label>
+                    <input type="file" id="csvFileInput" accept=".csv" class="hidden" onchange="handleFileUpload(this)">
+                    
+                    <button onclick="resetToRoot()" class="text-gray-500 hover:text-primary transition-colors text-sm font-medium flex items-center gap-2">
+                        <i class="fa-solid fa-house"></i> Top
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+        
+        <!-- Loading / Welcome Screen -->
+        <div id="welcome-screen" class="flex flex-col items-center justify-center py-20 text-center fade-in">
+            <div class="bg-white p-10 rounded-2xl shadow-xl max-w-lg w-full">
+                
+                <!-- State: Loading -->
+                <div id="loading-state">
+                    <div class="loader mx-auto mb-6"></div>
+                    <h2 class="text-xl font-bold text-gray-900 mb-2">Loading Organization Data...</h2>
+                    <p class="text-gray-500 text-sm">Fetching 'data.csv' from server.</p>
+                </div>
+
+                <!-- State: Error/Upload (Hidden by default) -->
+                <div id="upload-state" class="hidden">
+                    <div class="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4 text-red-500 text-2xl">
+                        <i class="fa-solid fa-exclamation"></i>
+                    </div>
+                    <h2 class="text-xl font-bold text-gray-900 mb-2">Data File Not Found</h2>
+                    <p class="text-gray-500 mb-6 text-sm">Could not automatically load <code>data.csv</code>. Please upload your CSV file manually.</p>
+                    
+                    <label for="csvFileInputHero" class="cursor-pointer inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-primary hover:bg-indigo-700 md:text-lg transition-colors w-full">
+                        <i class="fa-solid fa-upload mr-2"></i> Select CSV File
+                    </label>
+                    <input type="file" id="csvFileInputHero" accept=".csv" class="hidden" onchange="handleFileUpload(this)">
+                </div>
+            </div>
+        </div>
+
+        <!-- App Container (Hidden initially) -->
+        <div id="app-container" class="hidden">
+            <!-- Controls: Search & Breadcrumbs -->
+            <div class="mb-8 space-y-4">
+                <!-- Search Bar -->
+                <div class="relative max-w-2xl mx-auto">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <i class="fa-solid fa-search text-gray-400"></i>
+                    </div>
+                    <input type="text" id="search-input" 
+                        class="block w-full pl-10 pr-3 py-4 border border-gray-300 rounded-xl leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-2 focus:ring-primary focus:border-primary sm:text-lg shadow-sm transition-shadow" 
+                        placeholder="Search by name, title, skill, or keyword..."
+                        oninput="handleSearch(this.value)">
+                </div>
+
+                <!-- Breadcrumbs -->
+                <div id="breadcrumbs" class="flex flex-wrap items-center gap-2 text-sm text-gray-600 justify-center min-h-[2rem]">
+                    <!-- Injected via JS -->
+                </div>
+            </div>
+
+            <!-- Content Area -->
+            <div id="org-container" class="min-h-[500px]">
+                <!-- Cards injected here -->
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-gray-200 mt-auto">
+        <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+            <p class="text-center text-sm text-gray-500">
+                &copy; 2025 KNA Finance Organization.
+            </p>
+        </div>
+    </footer>
+
+    <!-- LOGIC -->
+    <script>
+        // ==========================================
+        // CONFIG & STATE
+        // ==========================================
+        const DATA_FILENAME = 'data.csv'; // <--- THIS IS THE FILE WE LOOK FOR
+        let ALL_DATA = [];
+        let currentRootId = null; 
+        let absoluteRoot = null;
+
+        // ==========================================
+        // INITIALIZATION
+        // ==========================================
+        document.addEventListener('DOMContentLoaded', () => {
+            // Attempt to fetch the CSV file automatically
+            fetch(DATA_FILENAME)
+                .then(response => {
+                    if (!response.ok) throw new Error("File not found");
+                    return response.text();
+                })
+                .then(csvText => {
+                    parseCSV(csvText);
+                })
+                .catch(error => {
+                    console.log("Auto-load failed. Waiting for user upload.", error);
+                    // Show upload fallback
+                    document.getElementById('loading-state').classList.add('hidden');
+                    document.getElementById('upload-state').classList.remove('hidden');
+                });
+        });
+
+        // ==========================================
+        // FILE UPLOAD & PARSING
+        // ==========================================
+        function handleFileUpload(input) {
+            const file = input.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const text = e.target.result;
+                parseCSV(text);
+            };
+            reader.readAsText(file);
+        }
+
+        function parseCSV(csvText) {
+            // Simple robust CSV parser that handles quoted fields
+            const rows = [];
+            let currentRow = [];
+            let currentField = '';
+            let insideQuotes = false;
+            
+            // Normalize newlines
+            csvText = csvText.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+            for (let i = 0; i < csvText.length; i++) {
+                const char = csvText[i];
+                const nextChar = csvText[i + 1];
+
+                if (char === '"') {
+                    if (insideQuotes && nextChar === '"') {
+                        currentField += '"'; // Escaped quote
+                        i++;
+                    } else {
+                        insideQuotes = !insideQuotes;
+                    }
+                } else if (char === ',' && !insideQuotes) {
+                    currentRow.push(currentField.trim());
+                    currentField = '';
+                } else if (char === '\n' && !insideQuotes) {
+                    currentRow.push(currentField.trim());
+                    if (currentRow.length > 1) rows.push(currentRow); // Skip empty lines
+                    currentRow = [];
+                    currentField = '';
+                } else {
+                    currentField += char;
+                }
+            }
+            if (currentField || currentRow.length > 0) {
+                currentRow.push(currentField.trim());
+                rows.push(currentRow);
+            }
+
+            // Map headers
+            if (rows.length < 2) return; // No data
+            const headers = rows[0].map(h => h.toLowerCase().replace(/[^a-z0-9]/g, ''));
+            
+            // Helper to find index roughly
+            const getIndex = (keys) => headers.findIndex(h => keys.some(k => h.includes(k)));
+
+            const idxId = getIndex(['unique', 'id']);
+            const idxName = getIndex(['full', 'name']);
+            const idxReports = getIndex(['report', 'manager']);
+            const idxTitle = getIndex(['title']);
+            const idxDept = getIndex(['department', 'team']);
+            const idxDesc = getIndex(['description', 'job']);
+            const idxKey = getIndex(['keyword']);
+            const idxSkill = getIndex(['skill']);
+
+            ALL_DATA = rows.slice(1).map(row => {
+                if (!row[idxId]) return null; // Skip invalid rows
+                
+                const safeSplit = (val) => val ? val.split(',').map(s => s.trim()).filter(s => s) : [];
+
+                return {
+                    id: row[idxId],
+                    name: row[idxName] || 'Unknown',
+                    managerId: row[idxReports] || '',
+                    title: row[idxTitle] || '',
+                    team: row[idxDept] || '',
+                    description: row[idxDesc] || 'No description available.',
+                    keywords: safeSplit(row[idxKey]),
+                    skills: safeSplit(row[idxSkill])
+                };
+            }).filter(item => item !== null);
+
+            // Initialize App
+            initApp();
+        }
+
+        function initApp() {
+            // Find root (Jerry Dervin or whoever has no manager or is self-referential)
+            absoluteRoot = ALL_DATA.find(p => !p.managerId || p.managerId === "") || ALL_DATA[0];
+            
+            if (absoluteRoot) {
+                currentRootId = absoluteRoot.id;
+                
+                // Switch views
+                document.getElementById('welcome-screen').classList.add('hidden');
+                document.getElementById('app-container').classList.remove('hidden');
+                
+                renderView();
+            } else {
+                alert("Could not determine the top of the organization tree. Please check your CSV.");
+            }
+        }
+
+
+        // ==========================================
+        // CORE FUNCTIONS
+        // ==========================================
+
+        function getDirectReports(managerId) {
+            return ALL_DATA.filter(item => item.managerId === managerId);
+        }
+
+        function getPerson(id) {
+            return ALL_DATA.find(item => item.id === id);
+        }
+
+        // --- RENDER LOGIC ---
+        function renderView() {
+            const container = document.getElementById('org-container');
+            const searchVal = document.getElementById('search-input').value.toLowerCase().trim();
+
+            container.innerHTML = ''; // Clear
+
+            if (searchVal.length > 0) {
+                renderSearchResults(searchVal, container);
+                updateBreadcrumbs(null); // No hierarchy in search mode
+            } else {
+                renderHierarchy(currentRootId, container);
+                updateBreadcrumbs(currentRootId);
+            }
+        }
+
+        function renderHierarchy(rootId, container) {
+            const rootPerson = getPerson(rootId);
+            if (!rootPerson) return;
+
+            const reports = getDirectReports(rootId);
+
+            let html = `
+                <div class="flex flex-col gap-10 fade-in">
+                    <!-- MANAGER SECTION -->
+                    <div class="flex flex-col items-center justify-center">
+                        <h2 class="text-sm font-bold text-gray-400 uppercase tracking-widest mb-4">Current Leader</h2>
+                        <div class="w-full max-w-sm">
+                            ${createCardHtml(rootPerson, true)}
+                        </div>
+                    </div>
+            `;
+
+            if (reports.length > 0) {
+                html += `
+                    <!-- REPORTS GRID -->
+                    <div class="w-full">
+                        <div class="flex items-center gap-4 mb-6">
+                            <h2 class="text-sm font-bold text-gray-400 uppercase tracking-widest">Direct Reports</h2>
+                            <span class="bg-gray-200 text-gray-600 text-xs px-2 py-1 rounded-full">${reports.length}</span>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                            ${reports.map(r => createCardHtml(r, false)).join('')}
+                        </div>
+                    </div>
+                `;
+            } else {
+                html += `
+                     <div class="text-center py-10">
+                        <p class="text-gray-400 italic">No direct reports listed for this position.</p>
+                    </div>
+                `;
+            }
+
+            html += `</div>`;
+            container.innerHTML = html;
+        }
+
+        function renderSearchResults(query, container) {
+            // Search Logic
+            const filtered = ALL_DATA.filter(item => {
+                const textMatch = item.name.toLowerCase().includes(query) || 
+                                  item.title.toLowerCase().includes(query) ||
+                                  item.team.toLowerCase().includes(query);
+                
+                // Safe check for arrays
+                const keyMatch = (item.keywords || []).some(k => k.toLowerCase().includes(query));
+                const skillMatch = (item.skills || []).some(s => s.toLowerCase().includes(query));
+                
+                return textMatch || keyMatch || skillMatch;
+            });
+
+            if (filtered.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center mt-12">
+                        <div class="text-6xl text-gray-200 mb-4"><i class="fa-solid fa-ghost"></i></div>
+                        <p class="text-xl text-gray-500">No results found for "${query}"</p>
+                    </div>`;
+                return;
+            }
+
+            container.innerHTML = `
+                <div>
+                    <h2 class="text-sm font-bold text-gray-400 uppercase tracking-widest mb-6">Search Results (${filtered.length})</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 fade-in">
+                        ${filtered.map(item => createCardHtml(item, false)).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        // --- COMPONENT GENERATION ---
+        function createCardHtml(person, isRoot) {
+            // Colors based on dept or random logic could go here. For now, standard styling.
+            const initials = person.name.split(' ').map(n => n[0]).join('').substring(0,2).toUpperCase();
+            
+            // Generate skill tags
+            const skillsHtml = (person.skills || []).slice(0, 4).map(s => 
+                `<span class="inline-block bg-blue-50 text-blue-700 text-xs px-2 py-1 rounded-md mb-1 mr-1">${s}</span>`
+            ).join('');
+
+            // Drill button logic
+            const hasReports = getDirectReports(person.id).length > 0;
+            const drillButton = hasReports 
+                ? `<button onclick="event.stopPropagation(); drillTo('${person.id}')" class="mt-3 w-full py-2 bg-primary hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center justify-center gap-2">
+                     See Team <i class="fa-solid fa-arrow-down text-xs"></i>
+                   </button>` 
+                : `<button disabled class="mt-3 w-full py-2 bg-gray-100 text-gray-400 text-sm font-medium rounded-lg cursor-not-allowed border border-gray-200">
+                     Individual Contributor
+                   </button>`;
+
+            // Highlight border if root
+            const rootClass = isRoot ? 'ring-2 ring-primary ring-offset-2' : '';
+
+            return `
+            <div class="card-container ${rootClass}" onclick="flipCard(this)">
+                <div class="flip-card">
+                    
+                    <!-- FRONT -->
+                    <div class="card-front p-6 flex flex-col justify-between items-center text-center">
+                        <div class="w-full flex justify-between items-start">
+                             <span class="px-2 py-1 rounded text-xs font-semibold bg-gray-100 text-gray-500">${person.id.split('_')[0]}</span>
+                             <i class="fa-solid fa-rotate text-gray-300 hover:text-primary transition-colors text-sm"></i>
+                        </div>
+
+                        <div class="flex-grow flex flex-col items-center justify-center mt-2">
+                            <div class="h-20 w-20 rounded-full bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center text-xl font-bold text-primary mb-4 shadow-inner border border-indigo-50">
+                                ${initials}
+                            </div>
+                            <h3 class="text-lg font-bold text-gray-900 leading-tight mb-1">${person.name}</h3>
+                            <p class="text-sm text-primary font-medium mb-1">${person.title}</p>
+                            <p class="text-xs text-gray-500 uppercase tracking-wide">${person.team}</p>
+                        </div>
+
+                        <div class="w-full mt-4">
+                            ${drillButton}
+                        </div>
+                    </div>
+
+                    <!-- BACK -->
+                    <div class="card-back p-6 custom-scrollbar overflow-y-auto">
+                        <div class="flex justify-between items-start mb-4 border-b border-gray-100 pb-2">
+                            <h4 class="font-bold text-gray-700 text-sm">Details</h4>
+                            <button class="text-gray-400 hover:text-gray-600">
+                                <i class="fa-solid fa-times"></i>
+                            </button>
+                        </div>
+                        
+                        <div class="space-y-4 text-left">
+                            <div>
+                                <p class="text-xs font-bold text-gray-400 uppercase mb-1">Job Description</p>
+                                <p class="text-sm text-gray-600 leading-relaxed">${person.description}</p>
+                            </div>
+
+                            ${person.skills && person.skills.length ? `
+                            <div>
+                                <p class="text-xs font-bold text-gray-400 uppercase mb-2">Key Skills</p>
+                                <div class="flex flex-wrap">
+                                    ${skillsHtml}
+                                </div>
+                            </div>
+                            ` : ''}
+
+                            <div>
+                                <p class="text-xs font-bold text-gray-400 uppercase mb-1">Reports To</p>
+                                <p class="text-sm text-primary font-medium flex items-center gap-2" onclick="event.stopPropagation(); drillToManager('${person.managerId}')">
+                                    <i class="fa-solid fa-user-tie"></i> 
+                                    ${getManagerName(person.managerId)}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+            `;
+        }
+
+        // --- UTILS ---
+        function getManagerName(managerId) {
+            if (!managerId) return "N/A (Top Level)";
+            const m = getPerson(managerId);
+            return m ? `<span class="hover:underline cursor-pointer">${m.name}</span>` : managerId;
+        }
+
+        function updateBreadcrumbs(activeId) {
+            const bcEl = document.getElementById('breadcrumbs');
+            if (!activeId) {
+                bcEl.innerHTML = '';
+                return;
+            }
+
+            let path = [];
+            let curr = getPerson(activeId);
+            // Protect against circular loops or broken chains
+            let limit = 0;
+            while (curr && limit < 20) {
+                path.unshift(curr);
+                if (!curr.managerId) break;
+                curr = getPerson(curr.managerId);
+                limit++;
+            }
+
+            // Limit breadcrumbs if too deep to prevent wrapping mess
+            const displayPath = path.length > 4 ? [path[0], {name: '...'}, ...path.slice(-2)] : path;
+
+            bcEl.innerHTML = displayPath.map((p, idx) => {
+                const isLast = idx === displayPath.length - 1;
+                const isEllipsis = p.name === '...';
+                
+                if (isEllipsis) return `<span class="text-gray-300">/</span><span class="text-gray-400">...</span>`;
+
+                const content = isLast 
+                    ? `<span class="font-bold text-gray-800 border-b-2 border-primary pb-0.5">${p.name}</span>` 
+                    : `<button onclick="drillTo('${p.id}')" class="hover:text-primary transition-colors">${p.name}</button>`;
+                
+                return (idx > 0 ? `<span class="text-gray-300 mx-1">/</span>` : '') + content;
+            }).join('');
+        }
+
+        // --- ACTIONS ---
+        window.flipCard = function(el) {
+            // If clicking a button inside, don't flip
+            if (event.target.tagName === 'BUTTON' || event.target.closest('button')) return;
+            
+            const inner = el.querySelector('.flip-card');
+            inner.classList.toggle('flipped');
+        }
+
+        window.drillTo = function(id) {
+            currentRootId = id;
+            document.getElementById('search-input').value = '';
+            renderView();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        window.drillToManager = function(managerId) {
+            if(!managerId) return;
+            drillTo(managerId);
+        }
+
+        window.resetToRoot = function() {
+            if(absoluteRoot) {
+                currentRootId = absoluteRoot.id;
+                document.getElementById('search-input').value = '';
+                renderView();
+            }
+        }
+
+        window.handleSearch = function(val) {
+            renderView();
+        }
+
+    </script>
+</body>
+</html>
